@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+
+# ===============================================================
+# RC-KOSIN-TOOL
+# Neovim Full IDE Installer (Stable Edition)
+# ===============================================================
+
+set -e
+
+NVIM_DIR="$HOME/.config/nvim"
+LAZY_DIR="$HOME/.local/share/nvim/lazy"
+NVM_DIR="$HOME/.nvm"
+
+# -----------------------------
+# UI
+# -----------------------------
+
+GREEN="\033[32m"
+RED="\033[31m"
+CYAN="\033[36m"
+RESET="\033[0m"
+
+msg() {
+    echo -e "${CYAN}[$1]${RESET} $2"
+}
+
+ok() {
+    echo -e "${GREEN}[OK]${RESET} $1"
+}
+
+err() {
+    echo -e "${RED}[ERROR]${RESET} $1"
+}
+
+# -----------------------------
+# sudo check
+# -----------------------------
+
+check_sudo() {
+
+if ! sudo -v >/dev/null 2>&1; then
+    err "sudo permission required"
+    exit 1
+fi
+
+}
+
+# -----------------------------
+# install dependencies
+# -----------------------------
+
+install_deps() {
+
+msg "INFO" "Installing dependencies..."
+
+sudo apt update
+
+sudo apt install -y \
+git curl wget unzip build-essential \
+ripgrep fd-find tar
+
+ok "Dependencies installed"
+
+}
+
+# -----------------------------
+# install nvm
+# -----------------------------
+
+install_nvm() {
+
+if [ -d "$NVM_DIR" ]; then
+    ok "nvm already installed"
+    return
+fi
+
+msg "INFO" "Installing nvm..."
+
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh -o /tmp/install_nvm.sh
+
+bash /tmp/install_nvm.sh
+
+}
+
+# -----------------------------
+# load nvm
+# -----------------------------
+
+load_nvm() {
+
+export NVM_DIR="$HOME/.nvm"
+
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    . "$NVM_DIR/nvm.sh"
+else
+    err "nvm load failed"
+    exit 1
+fi
+
+}
+
+# -----------------------------
+# install node
+# -----------------------------
+
+install_node() {
+
+msg "INFO" "Installing Node LTS..."
+
+nvm install --lts
+
+nvm use --lts
+
+nvm alias default lts/*
+
+ok "Node installed"
+
+}
+
+# -----------------------------
+# install neovim
+# -----------------------------
+
+install_neovim() {
+
+msg "INFO" "Installing Neovim..."
+
+curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
+
+sudo rm -rf /opt/nvim
+
+sudo mkdir -p /opt/nvim
+
+sudo tar -C /opt/nvim \
+-xzf nvim-linux-x86_64.tar.gz \
+--strip-components=1
+
+sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+
+rm nvim-linux-x86_64.tar.gz
+
+ok "Neovim installed"
+
+}
+
+# -----------------------------
+# install lazy.nvim
+# -----------------------------
+
+install_lazy() {
+
+if [ -d "$LAZY_DIR/lazy.nvim" ]; then
+    ok "lazy.nvim exists"
+    return
+fi
+
+msg "INFO" "Installing lazy.nvim..."
+
+git clone --filter=blob:none \
+https://github.com/folke/lazy.nvim.git \
+"$LAZY_DIR/lazy.nvim"
+
+}
+
+# -----------------------------
+# write config
+# -----------------------------
+
+write_config() {
+
+msg "INFO" "Writing Neovim config..."
+
+mkdir -p "$NVIM_DIR/lua/config"
+
+cat > "$NVIM_DIR/init.lua" << 'EOF'
+require("config.lazy")
+require("config.plugins")
+require("config.options")
+require("config.keymaps")
+EOF
+
+cat > "$NVIM_DIR/lua/config/options.lua" << 'EOF'
+local opt = vim.opt
+vim.g.mapleader = " "
+opt.number = true
+opt.relativenumber = true
+opt.tabstop = 4
+opt.shiftwidth = 4
+opt.expandtab = true
+opt.termguicolors = true
+EOF
+
+cat > "$NVIM_DIR/lua/config/keymaps.lua" << 'EOF'
+local map = vim.keymap.set
+map("n","<leader>w",":w<CR>")
+map("n","<leader>q",":q<CR>")
+map("i","jk","<Esc>")
+EOF
+
+cat > "$NVIM_DIR/lua/config/lazy.lua" << 'EOF'
+local lazypath = vim.fn.stdpath("data").."/lazy/lazy.nvim"
+vim.opt.rtp:prepend(lazypath)
+EOF
+
+cat > "$NVIM_DIR/lua/config/plugins.lua" << 'EOF'
+require("lazy").setup({
+
+{"folke/tokyonight.nvim",
+lazy=false,
+priority=1000,
+config=function()
+vim.cmd[[colorscheme tokyonight]]
+end
+},
+
+{"nvim-telescope/telescope.nvim",
+dependencies={"nvim-lua/plenary.nvim"}},
+
+{"nvim-treesitter/nvim-treesitter",
+build=":TSUpdate"},
+
+{"neovim/nvim-lspconfig"},
+
+{"hrsh7th/nvim-cmp",
+dependencies={
+"hrsh7th/cmp-nvim-lsp",
+"hrsh7th/cmp-buffer"
+}}
+
+})
+EOF
+
+ok "Config installed"
+
+}
+
+# -----------------------------
+# install LSP
+# -----------------------------
+
+install_lsp() {
+
+msg "INFO" "Installing LSP..."
+
+npm install -g pyright
+
+ok "LSP installed"
+
+}
+
+# -----------------------------
+# main
+# -----------------------------
+
+main() {
+
+echo
+echo "======================================"
+echo " RC-KOSIN Neovim IDE Installer"
+echo "======================================"
+echo
+
+check_sudo
+install_deps
+install_nvm
+load_nvm
+install_node
+install_neovim
+install_lazy
+write_config
+install_lsp
+
+echo
+ok "Neovim IDE Setup Complete"
+echo
+echo "Run:"
+echo
+echo "nvim"
+echo
+
+}
+
+main
+
