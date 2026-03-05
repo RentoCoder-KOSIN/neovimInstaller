@@ -1,0 +1,2 @@
+# neovimInstaller
+neovimを入れるためのスクリプトファイル
